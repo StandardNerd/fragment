@@ -1,0 +1,175 @@
+<section class="space-y-8">
+  <div class="space-y-2 border-b border-[var(--frag-border)] pb-5">
+    <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-mono bg-[var(--frag-accent-soft)] text-[var(--frag-accent)]">
+      REST JSON API
+    </div>
+    <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-[var(--frag-text)]">
+      API Documentation
+    </h1>
+    <p class="text-sm text-[var(--frag-text-muted)] max-w-2xl">
+      Create, retrieve, update, and delete code fragments programmatically. No authentication or account is required to create or read pastes.
+    </p>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] p-4 space-y-1">
+      <div class="text-xs font-mono text-[var(--frag-text-muted)]">Base URL</div>
+      <div class="text-sm font-mono font-semibold text-[var(--frag-text)]">{@base_url}/api</div>
+    </div>
+    <div class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] p-4 space-y-1">
+      <div class="text-xs font-mono text-[var(--frag-text-muted)]">Max Payload Size</div>
+      <div class="text-sm font-mono font-semibold text-[var(--frag-text)]">
+        512 KB (524,288 B)
+      </div>
+    </div>
+    <div class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] p-4 space-y-1">
+      <div class="text-xs font-mono text-[var(--frag-text-muted)]">Expiration Options</div>
+      <div class="text-sm font-mono font-semibold text-[var(--frag-text)]">
+        never, 10m, 1h, 1d, 7d, 30d
+      </div>
+    </div>
+  </div>
+
+  <!-- Endpoint 1: Create Paste -->
+  <article class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden space-y-4 p-5">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="px-2.5 py-1 rounded text-xs font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+        POST
+      </span>
+      <code class="text-sm font-mono font-semibold text-[var(--frag-text)]">/api/pastes</code>
+      <span class="text-xs text-[var(--frag-text-muted)]">— Create a new paste</span>
+    </div>
+
+    <p class="text-xs sm:text-sm text-[var(--frag-text-muted)]">
+      Creates a paste and returns its URL, raw URL, and a one-time
+      <code class="font-mono text-[var(--frag-text)]">edit_token</code>
+      (also aliased as <code class="font-mono text-[var(--frag-text)]">delete_token</code>) for future modification or deletion.
+    </p>
+
+    <div class="space-y-2">
+      <h3 class="text-xs font-mono uppercase tracking-wider text-[var(--frag-text-muted)]">
+        Request Body (JSON)
+      </h3>
+      <div class="overflow-x-auto rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)]">
+        <table class="w-full text-left text-xs font-mono">
+          <thead class="border-b border-[var(--frag-border)] bg-[var(--frag-surface-elevated)] text-[var(--frag-text-muted)]">
+            <tr>
+              <th class="px-3 py-2">Field</th>
+              <th class="px-3 py-2">Type</th>
+              <th class="px-3 py-2">Description</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[var(--frag-border-subtle)]">
+            <tr>
+              <td class="px-3 py-2 text-[var(--frag-accent)]">content *</td>
+              <td class="px-3 py-2 text-[var(--frag-text-muted)]">string</td>
+              <td class="px-3 py-2 font-sans text-[var(--frag-text)]">
+                Required. Paste text up to 512 KB.
+              </td>
+            </tr>
+            <tr>
+              <td class="px-3 py-2 text-[var(--frag-text)]">language</td>
+              <td class="px-3 py-2 text-[var(--frag-text-muted)]">string</td>
+              <td class="px-3 py-2 font-sans text-[var(--frag-text)]">
+                Optional. Defaults to <code class="font-mono">"auto"</code>. Supported: {Enum.join(
+                  @languages,
+                  ", "
+                )}.
+              </td>
+            </tr>
+            <tr>
+              <td class="px-3 py-2 text-[var(--frag-text)]">expires_in</td>
+              <td class="px-3 py-2 text-[var(--frag-text-muted)]">string</td>
+              <td class="px-3 py-2 font-sans text-[var(--frag-text)]">
+                Optional. One of <code class="font-mono">"never"</code>, <code class="font-mono">"10m"</code>, <code class="font-mono">"1h"</code>, <code class="font-mono">"1d"</code>, <code class="font-mono">"7d"</code>, <code class="font-mono">"30d"</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <h3 class="text-xs font-mono uppercase tracking-wider text-[var(--frag-text-muted)]">
+        Example Request &amp; Response (201 Created)
+      </h3>
+      <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl -X POST {@base_url}/api/pastes \
+  -H "Content-Type: application/json" \
+  -d '&#123;"content": "IO.puts(:hello)", "language": "elixir", "expires_in": "1d"&#125;'
+
+# Response (201 Created):
+&#123;
+  "id": "k9Xm2pQr",
+  "content": "IO.puts(:hello)",
+  "language": "elixir",
+  "size_bytes": 15,
+  "expires_at": "2026-11-07T21:45:00Z",
+  "inserted_at": "2026-11-06T21:45:00Z",
+  "updated_at": "2026-11-06T21:45:00Z",
+  "url": "{@base_url}/k9Xm2pQr",
+  "raw_url": "{@base_url}/raw/k9Xm2pQr",
+  "api_url": "{@base_url}/api/pastes/k9Xm2pQr",
+  "edit_token": "frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345",
+  "delete_token": "frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+&#125;</code></pre>
+    </div>
+  </article>
+
+  <!-- Endpoint 2: Get Paste JSON -->
+  <article class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden space-y-3 p-5">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="px-2.5 py-1 rounded text-xs font-mono font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+        GET
+      </span>
+      <code class="text-sm font-mono font-semibold text-[var(--frag-text)]">/api/pastes/:id</code>
+      <span class="text-xs text-[var(--frag-text-muted)]">— Fetch paste metadata &amp; content</span>
+    </div>
+
+    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl {@base_url}/api/pastes/k9Xm2pQr</code></pre>
+  </article>
+
+  <!-- Endpoint 3: Get Paste Raw -->
+  <article class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden space-y-3 p-5">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="px-2.5 py-1 rounded text-xs font-mono font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+        GET
+      </span>
+      <code class="text-sm font-mono font-semibold text-[var(--frag-text)]">
+        /api/pastes/:id/raw
+      </code>
+      <span class="text-xs text-[var(--frag-text-muted)]">
+        (or <code class="font-mono">/raw/:id</code>) — Fetch plain text content
+      </span>
+    </div>
+
+    <p class="text-xs sm:text-sm text-[var(--frag-text-muted)]">
+      Returns raw unescaped paste content with <code class="font-mono text-[var(--frag-text)]">Content-Type: text/plain; charset=utf-8</code>.
+    </p>
+
+    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl {@base_url}/api/pastes/k9Xm2pQr/raw</code></pre>
+  </article>
+
+  <!-- Endpoint 4: Delete Paste -->
+  <article class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden space-y-3 p-5">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="px-2.5 py-1 rounded text-xs font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+        DELETE
+      </span>
+      <code class="text-sm font-mono font-semibold text-[var(--frag-text)]">/api/pastes/:id</code>
+      <span class="text-xs text-[var(--frag-text-muted)]">— Delete a paste with edit token</span>
+    </div>
+
+    <p class="text-xs sm:text-sm text-[var(--frag-text-muted)]">
+      Supply the secret token via <code class="font-mono text-[var(--frag-text)]">Authorization: Bearer &lt;token&gt;</code>,
+      <code class="font-mono text-[var(--frag-text)]">X-Edit-Token</code>
+      header, JSON body <code class="font-mono text-[var(--frag-text)]">&#123;"edit_token": "..."&#125;</code>, or query param <code class="font-mono text-[var(--frag-text)]">?token=...</code>.
+    </p>
+
+    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl -X DELETE {@base_url}/api/pastes/k9Xm2pQr \
+  -H "Authorization: Bearer frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+
+# Response (200 OK):
+&#123;"deleted": true, "id": "k9Xm2pQr"&#125;</code></pre>
+  </article>
+</section>

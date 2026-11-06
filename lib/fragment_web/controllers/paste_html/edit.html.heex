@@ -1,0 +1,184 @@
+<section class="space-y-6">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div>
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--frag-text)]">
+          Manage fragment <span class="font-mono text-[var(--frag-accent)]">#{@paste.id}</span>
+        </h1>
+      </div>
+      <p class="text-sm text-[var(--frag-text-muted)] mt-0.5">
+        Enter the one-time secret token generated when this fragment was created to edit or delete it.
+      </p>
+    </div>
+
+    <a
+      href={~p"/#{@paste.id}"}
+      class="inline-flex items-center gap-1.5 text-xs font-mono text-[var(--frag-text-muted)] hover:text-[var(--frag-text)] transition-colors"
+    >
+      <.icon name="hero-arrow-left-mini" class="size-4" />
+      <span>Back to fragment</span>
+    </a>
+  </div>
+
+  <.form
+    :let={f}
+    for={@changeset}
+    action={~p"/pastes/#{@paste.id}"}
+    method="put"
+    id="edit-paste-form"
+    class="space-y-4"
+  >
+    <%= if @changeset.action do %>
+      <div
+        role="alert"
+        class="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-400"
+      >
+        <p class="font-medium">Could not update fragment:</p>
+        <ul class="mt-1 list-disc list-inside space-y-0.5 text-xs">
+          <%= for {field, {msg, opts}} <- @changeset.errors do %>
+            <li>
+              <span class="font-mono font-semibold">{Phoenix.Naming.humanize(field)}:</span>
+              {translate_error({msg, opts})}
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <!-- Secret Edit Token Input -->
+    <div class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] p-4 space-y-2">
+      <label
+        for="edit-token-input"
+        class="block text-xs font-mono font-medium text-[var(--frag-text)]"
+      >
+        Secret Edit / Claim Token
+      </label>
+      <input
+        type="password"
+        id="edit-token-input"
+        name="edit_token"
+        value={@edit_token}
+        required
+        placeholder="frag_..."
+        autocomplete="off"
+        class="w-full rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] px-3 py-2 text-xs font-mono text-[var(--frag-text)] placeholder:text-[var(--frag-text-faint)] focus:border-[var(--frag-accent)] focus:outline-none"
+      />
+    </div>
+
+    <!-- Editor Box -->
+    <div class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden shadow-xs focus-within:border-[var(--frag-accent)] transition-colors">
+      <div class="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 border-b border-[var(--frag-border)] bg-[var(--frag-surface-elevated)]">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label
+              for={f[:language].id}
+              class="text-xs font-medium text-[var(--frag-text-muted)]"
+            >
+              Syntax
+            </label>
+            <select
+              id={f[:language].id}
+              name={f[:language].name}
+              class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface)] px-2.5 py-1 text-xs font-mono text-[var(--frag-text)] focus:border-[var(--frag-accent)] focus:outline-none"
+            >
+              {Phoenix.HTML.Form.options_for_select(@language_options, f[:language].value)}
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label
+              for={f[:expires_in].id}
+              class="text-xs font-medium text-[var(--frag-text-muted)]"
+            >
+              Expiration
+            </label>
+            <select
+              id={f[:expires_in].id}
+              name={f[:expires_in].name}
+              class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface)] px-2.5 py-1 text-xs font-mono text-[var(--frag-text)] focus:border-[var(--frag-accent)] focus:outline-none"
+            >
+              {Phoenix.HTML.Form.options_for_select(@expiration_options, "")}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="relative flex">
+        <div class="relative w-12 shrink-0 select-none border-r border-[var(--frag-border-subtle)] bg-[var(--frag-surface-elevated)]/40">
+          <div
+            id="code-line-numbers"
+            aria-hidden="true"
+            class="code-line-gutter absolute inset-0 py-4 px-3 text-right text-sm leading-relaxed text-[var(--frag-text-faint)] overflow-hidden"
+          >
+            <%= for line_num <- line_numbers_for(f[:content].value) do %>
+              <div
+                class={["code-editor-line-num", line_num == 1 && "active"]}
+                data-line={line_num}
+              >
+                {line_num}
+              </div>
+            <% end %>
+          </div>
+        </div>
+        <textarea
+          id={f[:content].id}
+          name={f[:content].name}
+          rows="16"
+          wrap="off"
+          required
+          spellcheck="false"
+          class="code-input flex-1 w-full min-h-[20rem] p-4 bg-transparent text-sm leading-relaxed text-[var(--frag-text)] focus:outline-none resize-y overflow-x-auto"
+        >{f[:content].value}</textarea>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3">
+      <a
+        href={~p"/#{@paste.id}"}
+        class="px-4 py-2 rounded-md text-xs font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text)] transition-colors"
+      >
+        Cancel
+      </a>
+      <button
+        type="submit"
+        class="inline-flex items-center gap-1.5 px-5 py-2 rounded-md text-xs font-medium bg-[var(--frag-accent)] hover:bg-[var(--frag-accent-hover)] text-white transition-colors cursor-pointer"
+      >
+        <span>Save changes</span>
+      </button>
+    </div>
+  </.form>
+
+  <!-- Danger Zone: Delete Fragment -->
+  <div class="rounded-lg border border-rose-500/30 bg-rose-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="space-y-0.5">
+      <h2 class="text-sm font-semibold text-rose-400">Delete fragment</h2>
+      <p class="text-xs text-[var(--frag-text-muted)]">
+        Permanently delete this fragment using your secret token. This action cannot be undone.
+      </p>
+    </div>
+
+    <.form
+      for={%{}}
+      action={~p"/pastes/#{@paste.id}"}
+      method="delete"
+      id="delete-paste-form"
+      class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+    >
+      <input
+        type="password"
+        name="edit_token"
+        value={@edit_token}
+        required
+        placeholder="Secret token (frag_...)"
+        class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] px-3 py-1.5 text-xs font-mono text-[var(--frag-text)] placeholder:text-[var(--frag-text-faint)] focus:border-rose-500 focus:outline-none"
+      />
+      <button
+        type="submit"
+        class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer whitespace-nowrap"
+      >
+        <.icon name="hero-trash-mini" class="size-3.5" />
+        <span>Delete permanently</span>
+      </button>
+    </.form>
+  </div>
+</section>

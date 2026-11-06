@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <meta name="description" content="fragment — a minimal, modern pastebin alternative" />
+    <.live_title default="fragment" suffix=" · fragment" phx-no-format>{assigns[:page_title]}</.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+    <script>
+      (() => {
+        const resolveSystemTheme = () => {
+          if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+            return "light";
+          }
+          return "dark";
+        };
+
+        const applyTheme = (theme) => {
+          if (theme === "light" || theme === "dark") {
+            localStorage.setItem("phx:theme", theme);
+            document.documentElement.setAttribute("data-theme", theme);
+            document.documentElement.setAttribute("data-theme-source", "user");
+          } else {
+            localStorage.removeItem("phx:theme");
+            document.documentElement.setAttribute("data-theme", resolveSystemTheme());
+            document.documentElement.setAttribute("data-theme-source", "system");
+          }
+        };
+
+        const saved = localStorage.getItem("phx:theme");
+        applyTheme(saved || "system");
+
+        window.addEventListener("storage", (e) => {
+          if (e.key === "phx:theme") applyTheme(e.newValue || "system");
+        });
+
+        window.addEventListener("phx:set-theme", (e) => {
+          const requested = e.detail?.theme || e.target?.dataset?.phxTheme;
+          if (requested === "toggle") {
+            const current = document.documentElement.getAttribute("data-theme") || "dark";
+            applyTheme(current === "dark" ? "light" : "dark");
+          } else if (requested) {
+            applyTheme(requested);
+          }
+        });
+
+        if (window.matchMedia) {
+          window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+            if (document.documentElement.getAttribute("data-theme-source") === "system") {
+              document.documentElement.setAttribute("data-theme", resolveSystemTheme());
+            }
+          });
+        }
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen flex flex-col selection:bg-indigo-500/25">
+    <Layouts.app flash={@flash}>
+      {@inner_content}
+    </Layouts.app>
+  </body>
+</html>

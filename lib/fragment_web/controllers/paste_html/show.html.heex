@@ -1,0 +1,162 @@
+<section class="space-y-5">
+  <!-- One-time Secret Edit/Delete Token Banner -->
+  <%= if @one_time_edit_token do %>
+    <div
+      id="secret-token-banner"
+      role="region"
+      aria-label="One-time edit token"
+      class="rounded-lg border border-indigo-500/40 bg-[var(--frag-accent-soft)] p-4 space-y-3"
+    >
+      <div class="flex items-start justify-between gap-3">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 text-sm font-semibold text-[var(--frag-text)]">
+            <.icon name="hero-key-mini" class="size-4 text-[var(--frag-accent)]" />
+            <span>Save your claim / edit secret</span>
+            <span class="text-[11px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--frag-accent)] text-white">
+              Shown once
+            </span>
+          </div>
+          <p class="text-xs text-[var(--frag-text-muted)]">
+            Use this one-time token to edit or delete this fragment later via the web UI or API.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <code
+          id="one-time-edit-token"
+          class="flex-1 rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface)] px-3 py-2 text-xs font-mono text-[var(--frag-text)] select-all break-all"
+        >{@one_time_edit_token}</code>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            data-copy-text={@one_time_edit_token}
+            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text)] transition-colors cursor-pointer"
+          >
+            <.icon name="hero-clipboard-document-mini" class="size-3.5" />
+            <span data-copy-label>Copy token</span>
+          </button>
+
+          <a
+            href={~p"/pastes/#{@paste.id}/edit?token=#{@one_time_edit_token}"}
+            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text)] transition-colors"
+          >
+            <.icon name="hero-pencil-square-mini" class="size-3.5" />
+            <span>Edit</span>
+          </a>
+
+          <.form
+            for={%{}}
+            action={~p"/pastes/#{@paste.id}"}
+            method="delete"
+            class="inline"
+          >
+            <input type="hidden" name="edit_token" value={@one_time_edit_token} />
+            <button
+              type="submit"
+              data-confirm="Delete this fragment permanently?"
+              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors cursor-pointer"
+            >
+              <.icon name="hero-trash-mini" class="size-3.5" />
+              <span>Delete</span>
+            </button>
+          </.form>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Paste Header & Metadata -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <h1 class="text-lg sm:text-xl font-mono font-semibold tracking-tight text-[var(--frag-text)]">
+          #{@paste.id}
+        </h1>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-[var(--frag-accent-soft)] text-[var(--frag-accent)] border border-indigo-500/20">
+          {@language_label}
+        </span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono text-[var(--frag-text-muted)] bg-[var(--frag-surface-elevated)] border border-[var(--frag-border)]">
+          <.icon name="hero-clock-mini" class="size-3" />
+          {format_expiration(@paste.expires_at)}
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 text-xs text-[var(--frag-text-muted)] font-mono">
+        <span>{@line_count} {if @line_count == 1, do: "line", else: "lines"}</span>
+        <span>&bull;</span>
+        <span>{@formatted_size}</span>
+        <span>&bull;</span>
+        <span>Created {format_datetime(@paste.inserted_at)}</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        id="copy-code-btn"
+        data-copy-target="#raw-paste-content"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text)] transition-colors cursor-pointer"
+      >
+        <.icon name="hero-clipboard-mini" class="size-3.5" />
+        <span data-copy-label>Copy</span>
+      </button>
+
+      <a
+        href={~p"/raw/#{@paste.id}"}
+        id="raw-paste-link"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text)] transition-colors"
+      >
+        <.icon name="hero-document-text-mini" class="size-3.5" />
+        <span>Raw</span>
+      </a>
+
+      <a
+        href={~p"/?clone=#{@paste.id}"}
+        id="clone-paste-link"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text)] transition-colors"
+      >
+        <.icon name="hero-document-duplicate-mini" class="size-3.5" />
+        <span>Clone</span>
+      </a>
+
+      <a
+        href={~p"/pastes/#{@paste.id}/edit"}
+        id="edit-paste-link"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-[var(--frag-border)] bg-[var(--frag-surface)] hover:bg-[var(--frag-surface-elevated)] text-[var(--frag-text-muted)] hover:text-[var(--frag-text)] transition-colors"
+      >
+        <.icon name="hero-key-mini" class="size-3.5" />
+        <span>Manage</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Hidden Raw Textarea for Copy Button -->
+  <textarea id="raw-paste-content" class="sr-only" readonly aria-hidden="true">{@paste.content}</textarea>
+
+  <!-- Syntax Highlighted Code Block -->
+  <div
+    class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden shadow-xs"
+    data-language={@paste.language}
+  >
+    <div class="overflow-x-auto py-3">
+      <table class="w-full border-collapse font-mono text-xs sm:text-[13px] leading-6">
+        <tbody>
+          <%= for {line_num, line_html} <- @highlighted_lines do %>
+            <tr
+              id={"L#{line_num}"}
+              class="code-line-row hover:bg-[var(--frag-surface-elevated)]/60"
+            >
+              <td class="code-line-num w-12 px-3 text-right align-top select-none border-r border-[var(--frag-border-subtle)]">
+                <a href={"#L#{line_num}"} class="block">{line_num}</a>
+              </td>
+              <td class="px-4 whitespace-pre align-top text-[var(--frag-text)]">{line_html}</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

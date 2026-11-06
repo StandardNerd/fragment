@@ -1,0 +1,158 @@
+<section class="space-y-6">
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--frag-text)]">
+        <%= if @cloned_from do %>
+          Clone fragment
+          <a
+            href={~p"/#{@cloned_from.id}"}
+            class="font-mono text-base text-[var(--frag-accent)] hover:underline ml-1"
+          >
+            #{@cloned_from.id}
+          </a>
+        <% else %>
+          New fragment
+        <% end %>
+      </h1>
+      <p class="text-sm text-[var(--frag-text-muted)] mt-0.5">
+        Share code or plain text anonymously. Syntax is auto-detected unless specified.
+      </p>
+    </div>
+
+    <div class="text-xs font-mono text-[var(--frag-text-muted)] flex items-center gap-2">
+      <span id="paste-stats" data-max-bytes={@max_paste_bytes}>0 B / 512 KB</span>
+    </div>
+  </div>
+
+  <.form
+    :let={f}
+    for={@changeset}
+    action={~p"/pastes"}
+    method="post"
+    id="paste-form"
+    class="space-y-4"
+  >
+    <%= if @changeset.action do %>
+      <div
+        role="alert"
+        class="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-400"
+      >
+        <p class="font-medium">Could not create fragment:</p>
+        <ul class="mt-1 list-disc list-inside space-y-0.5 text-xs">
+          <%= for {field, {msg, opts}} <- @changeset.errors do %>
+            <li>
+              <span class="font-mono font-semibold">{Phoenix.Naming.humanize(field)}:</span>
+              {translate_error({msg, opts})}
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="rounded-lg border border-[var(--frag-border)] bg-[var(--frag-surface)] overflow-hidden shadow-xs focus-within:border-[var(--frag-accent)] transition-colors">
+      <!-- Editor Toolbar -->
+      <div class="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 border-b border-[var(--frag-border)] bg-[var(--frag-surface-elevated)]">
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Language Select -->
+          <div class="flex items-center gap-2">
+            <label
+              for={f[:language].id}
+              class="text-xs font-medium text-[var(--frag-text-muted)]"
+            >
+              Syntax
+            </label>
+            <select
+              id={f[:language].id}
+              name={f[:language].name}
+              class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface)] px-2.5 py-1 text-xs font-mono text-[var(--frag-text)] focus:border-[var(--frag-accent)] focus:outline-none"
+            >
+              {Phoenix.HTML.Form.options_for_select(
+                @language_options,
+                f[:language].value || "auto"
+              )}
+            </select>
+          </div>
+
+          <!-- Expiration Select -->
+          <div class="flex items-center gap-2">
+            <label
+              for={f[:expires_in].id}
+              class="text-xs font-medium text-[var(--frag-text-muted)]"
+            >
+              Expires
+            </label>
+            <select
+              id={f[:expires_in].id}
+              name={f[:expires_in].name}
+              class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface)] px-2.5 py-1 text-xs font-mono text-[var(--frag-text)] focus:border-[var(--frag-accent)] focus:outline-none"
+            >
+              {Phoenix.HTML.Form.options_for_select(
+                @expiration_options,
+                f[:expires_in].value || "never"
+              )}
+            </select>
+          </div>
+        </div>
+
+        <div class="hidden sm:flex items-center gap-2 text-[11px] font-mono text-[var(--frag-text-faint)]">
+          <span>Tab indents</span>
+          <span>&bull;</span>
+          <span>⌘/Ctrl + Enter to save</span>
+        </div>
+      </div>
+
+      <!-- Code Textarea with Line Numbers -->
+      <div class="relative flex">
+        <div class="relative w-12 shrink-0 select-none border-r border-[var(--frag-border-subtle)] bg-[var(--frag-surface-elevated)]/40">
+          <div
+            id="code-line-numbers"
+            aria-hidden="true"
+            class="code-line-gutter absolute inset-0 py-4 px-3 text-right text-sm leading-relaxed text-[var(--frag-text-faint)] overflow-hidden"
+          >
+            <%= for line_num <- line_numbers_for(f[:content].value) do %>
+              <div
+                class={["code-editor-line-num", line_num == 1 && "active"]}
+                data-line={line_num}
+              >
+                {line_num}
+              </div>
+            <% end %>
+          </div>
+        </div>
+        <textarea
+          id={f[:content].id}
+          name={f[:content].name}
+          rows="18"
+          wrap="off"
+          required
+          autofocus
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          autocorrect="off"
+          placeholder="Paste or type code here..."
+          class="code-input flex-1 w-full min-h-[24rem] p-4 bg-transparent text-sm leading-relaxed text-[var(--frag-text)] placeholder:text-[var(--frag-text-faint)] focus:outline-none resize-y overflow-x-auto"
+        >{f[:content].value}</textarea>
+      </div>
+    </div>
+
+    <%= for err <- field_errors(@changeset, :content) do %>
+      <p class="text-xs text-rose-400 font-mono">{err}</p>
+    <% end %>
+
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      <p class="text-xs text-[var(--frag-text-muted)]">
+        A one-time secret token will be generated so you can edit or delete this paste later.
+      </p>
+
+      <button
+        type="submit"
+        id="submit-paste-btn"
+        class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium bg-[var(--frag-accent)] hover:bg-[var(--frag-accent-hover)] text-white shadow-xs transition-colors cursor-pointer"
+      >
+        <span>Create fragment</span>
+        <.icon name="hero-arrow-right-mini" class="size-4" />
+      </button>
+    </div>
+  </.form>
+</section>

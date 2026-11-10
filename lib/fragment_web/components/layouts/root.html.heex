@@ -6,7 +6,7 @@
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="description" content="fragment — a minimal, modern pastebin alternative" />
     <.live_title default="fragment" suffix=" · fragment" phx-no-format>{assigns[:page_title]}</.live_title>
-    <link rel="icon" type="image/png" href={~p"/images/fragment-logo.png"} />
+    <link rel="icon" type="image/png" href={~p"/images/fragment_logo_dark_mode.png"} />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
@@ -19,6 +19,14 @@
           return "dark";
         };
 
+        const updateFavicon = () => {
+          const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+          const favicon = document.querySelector("link[rel='icon']");
+          if (favicon) {
+            favicon.href = isDark ? "/images/fragment_logo_dark_mode.png" : "/images/fragment-logo.png";
+          }
+        };
+
         const applyTheme = (theme) => {
           if (theme === "light" || theme === "dark") {
             localStorage.setItem("phx:theme", theme);
@@ -29,6 +37,7 @@
             document.documentElement.setAttribute("data-theme", resolveSystemTheme());
             document.documentElement.setAttribute("data-theme-source", "system");
           }
+          updateFavicon();
         };
 
         const saved = localStorage.getItem("phx:theme");
@@ -52,6 +61,7 @@
           window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
             if (document.documentElement.getAttribute("data-theme-source") === "system") {
               document.documentElement.setAttribute("data-theme", resolveSystemTheme());
+              updateFavicon();
             }
           });
         }

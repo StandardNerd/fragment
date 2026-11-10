@@ -20,9 +20,14 @@ defmodule FragmentWeb.Layouts do
               class="group inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-[var(--frag-text)] hover:opacity-90 transition-opacity"
             >
               <img
+                src={~p"/images/fragment_logo_dark_mode.png"}
+                alt="fragment logo"
+                class="logo-dark hidden dark:block h-14 w-auto rounded-md object-contain shadow-2xs"
+              />
+              <img
                 src={~p"/images/fragment-logo.png"}
                 alt="fragment logo"
-                class="h-14 w-auto rounded-md object-contain bg-white shadow-2xs"
+                class="logo-light block dark:hidden h-14 w-auto rounded-md object-contain bg-white shadow-2xs"
               />
             </a>
           </div>
@@ -57,9 +62,14 @@ defmodule FragmentWeb.Layouts do
         <div class="mx-auto max-w-5xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--frag-text-muted)]">
           <div class="flex items-center gap-2">
             <img
+              src={~p"/images/fragment_logo_dark_mode.png"}
+              alt="fragment logo"
+              class="logo-dark hidden dark:block h-4 w-auto rounded-xs object-contain"
+            />
+            <img
               src={~p"/images/fragment-logo.png"}
               alt="fragment logo"
-              class="h-4 w-auto rounded-xs object-contain bg-white"
+              class="logo-light block dark:hidden h-4 w-auto rounded-xs object-contain bg-white"
             />
             <span class="font-mono font-semibold text-[var(--frag-text)]">fragment</span>
             <span>&mdash;</span>

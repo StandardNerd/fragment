@@ -198,6 +198,21 @@ code, pre, textarea.code-input, .code-line-gutter {
   background-color: var(--frag-line-highlight);
 }
 
+/* Logo theme switching */
+.logo-dark {
+  display: none;
+}
+.logo-light {
+  display: block;
+}
+
+[data-theme="dark"] .logo-dark {
+  display: block;
+}
+[data-theme="dark"] .logo-light {
+  display: none;
+}
+
 .code-line-num {
   user-select: none;
   -webkit-user-select: none;

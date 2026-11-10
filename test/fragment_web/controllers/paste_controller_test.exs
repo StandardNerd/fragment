@@ -15,14 +15,21 @@ defmodule FragmentWeb.PasteControllerTest do
       assert html =~ ~s(id="code-line-numbers")
       assert html =~ ~s(data-line="1")
       assert html =~ "API Docs"
+      assert html =~ ~s(/images/fragment_logo_dark_mode.png)
       assert html =~ ~s(/images/fragment-logo.png)
       assert html =~ ~s(alt="fragment logo")
+      assert html =~ "logo-dark"
+      assert html =~ "logo-light"
     end
 
-    test "serves fragment-logo.png static asset", %{conn: conn} do
-      conn = get(conn, ~p"/images/fragment-logo.png")
-      assert conn.status == 200
-      assert response_content_type(conn, :png) =~ "image/png"
+    test "serves fragment-logo.png and fragment_logo_dark_mode.png static assets", %{conn: conn} do
+      conn1 = get(conn, ~p"/images/fragment-logo.png")
+      assert conn1.status == 200
+      assert response_content_type(conn1, :png) =~ "image/png"
+
+      conn2 = get(conn, ~p"/images/fragment_logo_dark_mode.png")
+      assert conn2.status == 200
+      assert response_content_type(conn2, :png) =~ "image/png"
     end
 
     test "pre-loads paste content and matching line numbers when cloning via ?clone=:id", %{

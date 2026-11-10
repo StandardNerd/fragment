@@ -1,13 +1,13 @@
 # Ansible Provisioning & Deployment for `fragment` on Proxmox VE
 
-This directory contains automated **Ansible playbooks** to provision an unprivileged LXC container (CT `106`) running **Ubuntu 24.04** on a Proxmox VE host (`192.168.1.19`) and deploy the **`fragment`** Elixir/Phoenix pastebin application with SQLite3 and Nginx.
+This directory contains automated **Ansible playbooks** to provision an unprivileged LXC container (CT `108`) running **Ubuntu 24.04** on a Proxmox VE host (`192.168.1.19`) and deploy the **`fragment`** Elixir/Phoenix pastebin application with SQLite3 and Nginx.
 
 ---
 
 ## Target Architecture
 
 - **Proxmox Host:** `192.168.1.19` (SSH user: `root`)
-- **Container 106 (`fragment-app`):** `192.168.1.26/24`
+- **Container 108 (`fragment-app`):** `192.168.1.26/24`
   - **Base OS:** Ubuntu 24.04 LTS (Noble Numbat)
   - **Runtime:** Erlang/OTP 26 + Elixir 1.17+
   - **Database:** SQLite3 (`/var/lib/fragment/fragment.db`)
@@ -21,7 +21,7 @@ This directory contains automated **Ansible playbooks** to provision an unprivil
 ```
 ansible/
 ├── ansible.cfg              # Ansible configuration & SSH parameters
-├── inventory.ini            # Target hosts (Proxmox host, LXC 106 IP)
+├── inventory.ini            # Target hosts (Proxmox host, LXC 108 IP)
 ├── group_vars/
 │   └── all.yml              # Variable definitions (Container specs, IP, paths, secrets)
 ├── templates/               # Jinja2 templates (configs & systemd units)
@@ -29,8 +29,8 @@ ansible/
 │   ├── fragment.service.j2
 │   └── nginx_fragment.conf.j2
 ├── playbook.yml             # Full automated provisioning & deployment playbook
-├── deploy_lxc106.yml        # Quick application build & deployment to CT 106
-├── deploy_lxc101.yml        # Backward-compatible alias deploying to CT 106
+├── deploy_lxc108.yml        # Quick application build & deployment to CT 108
+├── deploy_lxc101.yml        # Backward-compatible alias deploying to CT 108
 └── db_migrate.yml           # Standalone database migration runner
 ```
 
@@ -49,19 +49,19 @@ brew install ansible sshpass
 
 ### Full Provisioning & Deployment (from scratch)
 
-Execute `playbook.yml` against the Proxmox host to download the Ubuntu 24.04 template, create CT 106, install Erlang/Elixir, compile assets, build the OTP release, and configure Nginx:
+Execute `playbook.yml` against the Proxmox host to download the Ubuntu 24.04 template, create CT 108, install Erlang/Elixir, compile assets, build the OTP release, and configure Nginx:
 
 ```bash
 cd ansible
 ansible-playbook -i inventory.ini playbook.yml --extra-vars "ansible_ssh_pass=dexter33143"
 ```
 
-### Fast Code Redeployment to CT 106
+### Fast Code Redeployment to CT 108
 
 To sync codebase updates, run `mix precommit`, compile assets, rebuild the release, and restart `fragment.service`:
 
 ```bash
-ansible-playbook -i inventory.ini deploy_lxc106.yml --extra-vars "ansible_ssh_pass=dexter33143"
+ansible-playbook -i inventory.ini deploy_lxc108.yml --extra-vars "ansible_ssh_pass=dexter33143"
 ```
 
 *(You can also run `ansible-playbook -i inventory.ini deploy_lxc101.yml ...` or `playbook.yml --tags redeploy`)*
@@ -86,8 +86,8 @@ After playbook execution, verify the running application:
 curl -I http://192.168.1.26
 
 # Check Fragment systemd service status via Proxmox pct
-sshpass -p 'dexter33143' ssh root@192.168.1.19 "pct exec 106 -- systemctl status fragment"
+sshpass -p 'dexter33143' ssh root@192.168.1.19 "pct exec 108 -- systemctl status fragment"
 
-# Inspect SQLite database inside CT 106
-sshpass -p 'dexter33143' ssh root@192.168.1.19 "pct exec 106 -- ls -la /var/lib/fragment"
+# Inspect SQLite database inside CT 108
+sshpass -p 'dexter33143' ssh root@192.168.1.19 "pct exec 108 -- ls -la /var/lib/fragment"
 ```

@@ -1,11 +1,11 @@
-# run migrations inside lxc 106:
+# run migrations inside lxc 108:
 # ansible-playbook ./ansible/db_migrate.yml -i ansible/inventory.ini
 ---
-- name: Run Database Migrations in Proxmox LXC Container ID 106
+- name: Run Database Migrations in Proxmox LXC Container ID 108
   hosts: proxmox_hosts
   gather_facts: false
   vars:
-    lxc_id: 106
+    lxc_id: 108
     build_dir: "/tmp/fragment-build"
     app_dir: "/opt/fragment"
     app_user: "fragment"

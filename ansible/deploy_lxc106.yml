@@ -1,11 +1,11 @@
-# deploy fragment to lxc 106:
-# ansible-playbook ./ansible/deploy_lxc106.yml -i ansible/inventory.ini
+# deploy fragment to lxc 108:
+# ansible-playbook ./ansible/deploy_lxc108.yml -i ansible/inventory.ini
 ---
-- name: Deploy Fragment Code to Proxmox LXC Container ID 106 (Ubuntu 24.04)
+- name: Deploy Fragment Code to Proxmox LXC Container ID 108 (Ubuntu 24.04)
   hosts: proxmox_hosts
   gather_facts: false
   vars:
-    lxc_id: 106
+    lxc_id: 108
     build_dir: "/tmp/fragment-build"
     app_dir: "/opt/fragment"
     app_user: "fragment"

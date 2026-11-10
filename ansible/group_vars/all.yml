@@ -8,8 +8,8 @@ storage_pool: "local-lvm"
 template_pattern: "ubuntu-24.04"
 template_name: "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 
-# Target LXC Container ID 106 (Fragment App - Ubuntu 24.04)
-app_vmid: 106
+# Target LXC Container ID 108 (Fragment App - Ubuntu 24.04)
+app_vmid: 108
 app_hostname: "fragment-app"
 app_ip: "192.168.1.26"
 app_ram: 4096

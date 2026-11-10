@@ -1,5 +1,5 @@
 ---
-- name: Provision Proxmox VE LXC Container 106 (Ubuntu 24.04) & Deploy Fragment
+- name: Provision Proxmox VE LXC Container 108 (Ubuntu 24.04) & Deploy Fragment
   hosts: proxmox_hosts
   gather_facts: false
   vars_files:
@@ -7,7 +7,7 @@
 
   tasks:
     # -------------------------------------------------------------
-    # 1. PROXMOX HOST: UBUNTU 24.04 TEMPLATE & LXC 106 PROVISIONING
+    # 1. PROXMOX HOST: UBUNTU 24.04 TEMPLATE & LXC 108 PROVISIONING
     # -------------------------------------------------------------
     - name: 1.1 Ensure Ubuntu 24.04 LXC template is downloaded on Proxmox host
       ansible.builtin.shell: |
@@ -58,7 +58,7 @@
         seconds: 8
 
     # -------------------------------------------------------------
-    # 2. CT 106: UBUNTU 24.04 PACKAGES, RUNTIME & DIRECTORIES
+    # 2. CT 108: UBUNTU 24.04 PACKAGES, RUNTIME & DIRECTORIES
     # -------------------------------------------------------------
     - name: 2.1 Update apt packages inside CT {{ app_vmid }}
       ansible.builtin.command: pct exec {{ app_vmid }} -- env DEBIAN_FRONTEND=noninteractive apt-get update

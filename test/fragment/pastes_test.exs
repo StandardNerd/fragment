@@ -17,7 +17,8 @@ defmodule Fragment.PastesTest do
 
       assert {:ok, %Paste{} = paste} = Pastes.create_paste(attrs)
       assert is_binary(paste.id)
-      assert String.length(paste.id) == 8
+      assert String.length(paste.id) == 4
+      assert paste.id =~ ~r/^[0-9a-z]{4}$/
       assert paste.language == "elixir"
       assert paste.size_bytes == byte_size(attrs.content)
       assert %DateTime{} = paste.expires_at
@@ -45,6 +46,14 @@ defmodule Fragment.PastesTest do
 
       {:ok, never_paste} = Pastes.create_paste(%{content: "forever", expires_in: "never"})
       assert is_nil(never_paste.expires_at)
+    end
+
+    test "generates 4-character lowercase alphanumeric ids" do
+      for _ <- 1..50 do
+        id = Paste.generate_id()
+        assert byte_size(id) == 4
+        assert id =~ ~r/^[0-9a-z]{4}$/
+      end
     end
 
     test "rejects blank or missing content" do

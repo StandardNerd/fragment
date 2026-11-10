@@ -100,16 +100,16 @@
 
 # Response (201 Created):
 &#123;
-  "id": "k9Xm2pQr",
+  "id": "k9xm",
   "content": "IO.puts(:hello)",
   "language": "elixir",
   "size_bytes": 15,
   "expires_at": "2026-11-07T21:45:00Z",
   "inserted_at": "2026-11-06T21:45:00Z",
   "updated_at": "2026-11-06T21:45:00Z",
-  "url": "{@base_url}/k9Xm2pQr",
-  "raw_url": "{@base_url}/raw/k9Xm2pQr",
-  "api_url": "{@base_url}/api/pastes/k9Xm2pQr",
+  "url": "{@base_url}/k9xm",
+  "raw_url": "{@base_url}/raw/k9xm",
+  "api_url": "{@base_url}/api/pastes/k9xm",
   "edit_token": "frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345",
   "delete_token": "frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 &#125;</code></pre>
@@ -126,7 +126,7 @@
       <span class="text-xs text-[var(--frag-text-muted)]">— Fetch paste metadata &amp; content</span>
     </div>
 
-    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl {@base_url}/api/pastes/k9Xm2pQr</code></pre>
+    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl {@base_url}/api/pastes/k9xm</code></pre>
   </article>
 
   <!-- Endpoint 3: Get Paste Raw -->
@@ -147,7 +147,7 @@
       Returns raw unescaped paste content with <code class="font-mono text-[var(--frag-text)]">Content-Type: text/plain; charset=utf-8</code>.
     </p>
 
-    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl {@base_url}/api/pastes/k9Xm2pQr/raw</code></pre>
+    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl {@base_url}/api/pastes/k9xm/raw</code></pre>
   </article>
 
   <!-- Endpoint 4: Delete Paste -->
@@ -166,10 +166,10 @@
       header, JSON body <code class="font-mono text-[var(--frag-text)]">&#123;"edit_token": "..."&#125;</code>, or query param <code class="font-mono text-[var(--frag-text)]">?token=...</code>.
     </p>
 
-    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl -X DELETE {@base_url}/api/pastes/k9Xm2pQr \
+    <pre class="rounded-md border border-[var(--frag-border)] bg-[var(--frag-bg)] p-3.5 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--frag-text)]"><code>curl -X DELETE {@base_url}/api/pastes/k9xm \
   -H "Authorization: Bearer frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 
 # Response (200 OK):
-&#123;"deleted": true, "id": "k9Xm2pQr"&#125;</code></pre>
+&#123;"deleted": true, "id": "k9xm"&#125;</code></pre>
   </article>
 </section>

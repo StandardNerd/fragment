@@ -9,7 +9,7 @@ defmodule Fragment.Pastes do
   alias Fragment.Pastes.Paste
   alias Fragment.Repo
 
-  @max_id_retries 3
+  @max_id_retries 5
 
   @doc """
   Returns a form changeset for tracking paste changes in the UI.

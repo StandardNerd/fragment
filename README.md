@@ -77,16 +77,16 @@ curl -X POST http://localhost:4000/api/pastes \
 
 ```json
 {
-  "id": "k9Xm2pQr",
+  "id": "k9xm",
   "content": "defmodule Hello do\n  def world, do: :ok\nend",
   "language": "elixir",
   "size_bytes": 43,
   "expires_at": "2026-11-07T21:45:00Z",
   "inserted_at": "2026-11-06T21:45:00Z",
   "updated_at": "2026-11-06T21:45:00Z",
-  "url": "http://localhost:4000/k9Xm2pQr",
-  "raw_url": "http://localhost:4000/raw/k9Xm2pQr",
-  "api_url": "http://localhost:4000/api/pastes/k9Xm2pQr",
+  "url": "http://localhost:4000/k9xm",
+  "raw_url": "http://localhost:4000/raw/k9xm",
+  "api_url": "http://localhost:4000/api/pastes/k9xm",
   "edit_token": "frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345",
   "delete_token": "frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 }
@@ -101,7 +101,7 @@ GET /api/pastes/:id
 ```
 
 ```bash
-curl http://localhost:4000/api/pastes/k9Xm2pQr
+curl http://localhost:4000/api/pastes/k9xm
 ```
 
 Returns `200 OK` with paste metadata and content (excluding `edit_token` / `delete_token`), or `404 Not Found` if the paste does not exist or has expired.
@@ -116,7 +116,7 @@ GET /raw/:id
 ```
 
 ```bash
-curl http://localhost:4000/api/pastes/k9Xm2pQr/raw
+curl http://localhost:4000/api/pastes/k9xm/raw
 ```
 
 Returns `200 OK` with `Content-Type: text/plain; charset=utf-8` and the exact unescaped paste content, or `404 Not Found` if missing/expired.
@@ -132,7 +132,7 @@ Content-Type: application/json
 ```
 
 ```bash
-curl -X PUT http://localhost:4000/api/pastes/k9Xm2pQr \
+curl -X PUT http://localhost:4000/api/pastes/k9xm \
   -H "Authorization: Bearer frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345" \
   -H "Content-Type: application/json" \
   -d '{"content": "updated content", "language": "elixir"}'
@@ -154,7 +154,7 @@ The secret edit/delete token can be passed via:
 - Query string: `?token=<token>`
 
 ```bash
-curl -X DELETE http://localhost:4000/api/pastes/k9Xm2pQr \
+curl -X DELETE http://localhost:4000/api/pastes/k9xm \
   -H "Authorization: Bearer frag_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 ```
 
@@ -163,6 +163,6 @@ curl -X DELETE http://localhost:4000/api/pastes/k9Xm2pQr \
 ```json
 {
   "deleted": true,
-  "id": "k9Xm2pQr"
+  "id": "k9xm"
 }
 ```

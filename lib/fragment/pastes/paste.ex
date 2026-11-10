@@ -12,8 +12,9 @@ defmodule Fragment.Pastes.Paste do
   @foreign_key_type :string
 
   @max_paste_bytes 524_288
-  @id_alphabet ~c"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-  @id_length 8
+  @id_alphabet ~c"0123456789abcdefghijklmnopqrstuvwxyz"
+  @id_length 4
+  @reserved_ids MapSet.new(~w(docs edit live post raw new api dev css js))
 
   @expiration_options [
     {"Never", "never"},
@@ -250,14 +251,21 @@ defmodule Fragment.Pastes.Paste do
   end
 
   @doc """
-  Generates a random 8-character nanoid-style alphanumeric slug.
+  Generates a random 4-character lowercase alphanumeric slug.
   """
   def generate_id(length \\ @id_length) do
     alphabet = List.to_tuple(@id_alphabet)
     size = tuple_size(alphabet)
 
-    for <<byte <- :crypto.strong_rand_bytes(length)>>, into: "" do
-      <<elem(alphabet, rem(byte, size))::utf8>>
+    id =
+      for <<byte <- :crypto.strong_rand_bytes(length)>>, into: "" do
+        <<elem(alphabet, rem(byte, size))::utf8>>
+      end
+
+    if MapSet.member?(@reserved_ids, id) do
+      generate_id(length)
+    else
+      id
     end
   end
 

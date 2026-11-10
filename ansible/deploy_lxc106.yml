@@ -153,9 +153,9 @@
       delay: 2
       until: http_check.status in [200, 302]
 
-    - name: 16b. Verify logo SVG endpoint
+    - name: 16b. Verify logo endpoint
       ansible.builtin.uri:
-        url: "http://{{ app_ip }}:{{ app_port }}/images/logo.svg"
+        url: "http://{{ app_ip }}:{{ app_port }}/images/fragment-logo.png"
         status_code: [200, 404]
       register: logo_check
       failed_when: false
@@ -171,7 +171,7 @@
           - " Application Directory  : {{ app_dir }}"
           - " SQLite Database        : {{ db_path }}"
           - " Application Endpoint   : http://{{ app_ip }}:{{ app_port }}"
-          - " Logo Image Endpoint     : http://{{ app_ip }}:{{ app_port }}/images/logo.svg"
+          - " Logo Image Endpoint     : http://{{ app_ip }}:{{ app_port }}/images/fragment-logo.png"
           - " HTTP Check Status       : {{ http_check.status }}"
           - " Logo Check Status       : {{ logo_check.status }}"
           - " Systemd Service Status  : Active (Running)"

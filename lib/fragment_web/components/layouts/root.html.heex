@@ -6,6 +6,7 @@
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="description" content="fragment — a minimal, modern pastebin alternative" />
     <.live_title default="fragment" suffix=" · fragment" phx-no-format>{assigns[:page_title]}</.live_title>
+    <link rel="icon" type="image/png" href={~p"/images/fragment-logo.png"} />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>

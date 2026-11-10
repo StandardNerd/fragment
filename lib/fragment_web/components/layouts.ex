@@ -19,10 +19,11 @@ defmodule FragmentWeb.Layouts do
               href={~p"/"}
               class="group inline-flex items-center gap-2.5 text-base font-semibold tracking-tight text-[var(--frag-text)] hover:opacity-90 transition-opacity"
             >
-              <span class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[var(--frag-accent)] text-white font-mono text-xs font-bold shadow-xs">
-                &gt;_
-              </span>
-              <span class="font-mono tracking-tight">fragment</span>
+              <img
+                src={~p"/images/fragment-logo.png"}
+                alt="fragment logo"
+                class="h-14 w-auto rounded-md object-contain bg-white shadow-2xs"
+              />
             </a>
           </div>
 
@@ -55,6 +56,11 @@ defmodule FragmentWeb.Layouts do
       <footer class="border-t border-[var(--frag-border)] py-6 mt-12">
         <div class="mx-auto max-w-5xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--frag-text-muted)]">
           <div class="flex items-center gap-2">
+            <img
+              src={~p"/images/fragment-logo.png"}
+              alt="fragment logo"
+              class="h-4 w-auto rounded-xs object-contain bg-white"
+            />
             <span class="font-mono font-semibold text-[var(--frag-text)]">fragment</span>
             <span>&mdash;</span>
             <span>minimal anonymous pastebin</span>

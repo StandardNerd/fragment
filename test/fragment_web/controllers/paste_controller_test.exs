@@ -6,7 +6,7 @@ defmodule FragmentWeb.PasteControllerTest do
   alias Fragment.Pastes.Paste
 
   describe "GET / (new paste page)" do
-    test "renders new fragment form with dark mode default, line numbers gutter, and API footer link",
+    test "renders new fragment form with dark mode default, line numbers gutter, API footer link, and logo",
          %{conn: conn} do
       conn = get(conn, ~p"/")
       html = html_response(conn, 200)
@@ -15,6 +15,14 @@ defmodule FragmentWeb.PasteControllerTest do
       assert html =~ ~s(id="code-line-numbers")
       assert html =~ ~s(data-line="1")
       assert html =~ "API Docs"
+      assert html =~ ~s(/images/fragment-logo.png)
+      assert html =~ ~s(alt="fragment logo")
+    end
+
+    test "serves fragment-logo.png static asset", %{conn: conn} do
+      conn = get(conn, ~p"/images/fragment-logo.png")
+      assert conn.status == 200
+      assert response_content_type(conn, :png) =~ "image/png"
     end
 
     test "pre-loads paste content and matching line numbers when cloning via ?clone=:id", %{

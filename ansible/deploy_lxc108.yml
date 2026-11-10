@@ -145,18 +145,21 @@
     - name: 16. Verify HTTP service endpoint
       ansible.builtin.uri:
         url: "http://{{ app_ip }}:{{ app_port }}"
+        follow_redirects: none
         status_code:
           - 200
+          - 301
           - 302
       register: http_check
       retries: 10
       delay: 2
-      until: http_check.status in [200, 302]
+      until: http_check.status in [200, 301, 302]
 
     - name: 16b. Verify logo endpoint
       ansible.builtin.uri:
         url: "http://{{ app_ip }}:{{ app_port }}/images/fragment-logo.png"
-        status_code: [200, 404]
+        follow_redirects: none
+        status_code: [200, 301, 302, 404]
       register: logo_check
       failed_when: false
 

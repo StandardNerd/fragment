@@ -1,0 +1,36 @@
+---
+# Infrastructure Parameters (Proxmox VE Host)
+proxmox_ip: "192.168.1.19"
+net_bridge: "vmbr0"
+subnet_mask: "24"
+gateway_ip: "192.168.1.1"
+storage_pool: "local-lvm"
+template_pattern: "ubuntu-24.04"
+template_name: "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
+
+# Target LXC Container ID 106 (Fragment App - Ubuntu 24.04)
+app_vmid: 106
+app_hostname: "fragment-app"
+app_ip: "192.168.1.26"
+app_ram: 4096
+app_cores: 2
+app_disk: "20"
+
+# Application Secrets & Security
+secret_key_base: "{{ vault_secret_key_base | default('6b177894a896d74ee51121d582b13c72b22579b940026e63eb8c3938562d9804e76a06652b0475253e7f4c0a59a930773d5733e8b0b9a89c7d4e5f6g7h8i9j0k') }}"
+
+# Phoenix Application Settings (Fragment)
+app_name: "fragment"
+app_port: 4000
+phx_host: "fragment.local"
+app_user: "fragment"
+app_dir: "/opt/fragment"
+db_path: "/var/lib/fragment/fragment.db"
+env_file_path: "/etc/fragment/fragment.env"
+app_source_dir: "/tmp/fragment-build"
+
+# Matches the :app atom in mix.exs (the release binary name)
+app_bin_name: fragment
+
+# Absolute path to the source tree on the control machine / Proxmox host
+app_local_path: "{{ playbook_dir }}/.."

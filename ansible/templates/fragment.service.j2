@@ -1,0 +1,19 @@
+[Unit]
+Description=Fragment Phoenix Pastebin Service
+After=network.target
+
+[Service]
+Type=exec
+User={{ app_user }}
+Group={{ app_user }}
+WorkingDirectory={{ app_dir }}
+EnvironmentFile={{ env_file_path }}
+ExecStart={{ app_dir }}/bin/fragment start
+ExecStop={{ app_dir }}/bin/fragment stop
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+

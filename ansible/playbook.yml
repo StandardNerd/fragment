@@ -1,0 +1,297 @@
+---
+- name: Provision Proxmox VE LXC Container 106 (Ubuntu 24.04) & Deploy Fragment
+  hosts: proxmox_hosts
+  gather_facts: false
+  vars_files:
+    - group_vars/all.yml
+
+  tasks:
+    # -------------------------------------------------------------
+    # 1. PROXMOX HOST: UBUNTU 24.04 TEMPLATE & LXC 106 PROVISIONING
+    # -------------------------------------------------------------
+    - name: 1.1 Ensure Ubuntu 24.04 LXC template is downloaded on Proxmox host
+      ansible.builtin.shell: |
+        pveam update
+        if ! pveam list local | grep -q "ubuntu-24.04"; then
+          TEMPLATE_NAME=$(pveam available | grep "ubuntu-24.04" | head -n1 | awk '{print $2}')
+          pveam download local "$TEMPLATE_NAME"
+        fi
+        UBUNTU_TMPL=$(pveam list local | grep "ubuntu-24.04" | head -n1 | awk '{print $1}')
+        echo "FOUND_TEMPLATE=$UBUNTU_TMPL"
+      register: template_check
+      changed_when: false
+
+    - name: 1.2 Set resolved template variable
+      ansible.builtin.set_fact:
+        resolved_template: "{{ template_check.stdout | regex_search('FOUND_TEMPLATE=(.*)', '\\1') | first }}"
+
+    - name: 1.3 Debug resolved Ubuntu 24.04 template
+      ansible.builtin.debug:
+        msg: "Using Ubuntu 24.04 LXC template: {{ resolved_template }}"
+
+    - name: 1.4 Check CT {{ app_vmid }} ({{ app_hostname }}) status
+      ansible.builtin.command: pct status {{ app_vmid }}
+      register: app_status
+      failed_when: false
+      changed_when: false
+
+    - name: 1.5 Create CT {{ app_vmid }} ({{ app_hostname }}) if not exists
+      ansible.builtin.command: >
+        pct create {{ app_vmid }} {{ resolved_template }}
+        --hostname {{ app_hostname }}
+        --cores {{ app_cores }}
+        --memory {{ app_ram }}
+        --swap 512
+        --net0 name=eth0,bridge={{ net_bridge }},ip={{ app_ip }}/{{ subnet_mask }},gw={{ gateway_ip }}
+        --storage {{ storage_pool }}
+        --rootfs {{ storage_pool }}:{{ app_disk }}
+        --unprivileged 1
+        --onboot 1
+      when: app_status.rc != 0
+
+    - name: 1.6 Start CT {{ app_vmid }} if not running
+      ansible.builtin.command: pct start {{ app_vmid }}
+      when: "app_status.rc != 0 or 'status: stopped' in app_status.stdout"
+
+    - name: 1.7 Wait for container networking to initialize
+      ansible.builtin.pause:
+        seconds: 8
+
+    # -------------------------------------------------------------
+    # 2. CT 106: UBUNTU 24.04 PACKAGES, RUNTIME & DIRECTORIES
+    # -------------------------------------------------------------
+    - name: 2.1 Update apt packages inside CT {{ app_vmid }}
+      ansible.builtin.command: pct exec {{ app_vmid }} -- env DEBIAN_FRONTEND=noninteractive apt-get update
+
+    - name: 2.2 Install build tools, Erlang OTP 26, SQLite, Nginx, and utilities inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- env DEBIAN_FRONTEND=noninteractive apt-get install -y
+        git build-essential ca-certificates openssl curl unzip sqlite3 libsqlite3-dev
+        nginx erlang-base erlang-dev erlang-xmerl erlang-parsetools erlang-tools
+        erlang-runtime-tools erlang-ssl erlang-crypto sudo python3
+
+    - name: 2.3 Ensure Elixir 1.17+ is installed inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "
+        if ! elixir --version 2>/dev/null | grep -q 'Elixir 1.17'; then
+          curl -sSL -o /tmp/elixir.zip https://github.com/elixir-lang/elixir/releases/download/v1.17.3/elixir-otp-26.zip &&
+          unzip -qo /tmp/elixir.zip -d /usr/local &&
+          chmod -R +x /usr/local/bin /usr/local/lib &&
+          ln -sf /usr/local/bin/elixir /usr/bin/elixir &&
+          ln -sf /usr/local/bin/elixirc /usr/bin/elixirc &&
+          ln -sf /usr/local/bin/iex /usr/bin/iex &&
+          ln -sf /usr/local/bin/mix /usr/bin/mix &&
+          rm -f /tmp/elixir.zip
+        fi"
+
+    - name: 2.4 Install Hex and Rebar inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "mix local.hex --force && mix local.rebar --force"
+
+    - name: 2.5 Create system user {{ app_user }} inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "id -u {{ app_user }} &>/dev/null || useradd -r -s /bin/bash {{ app_user }}"
+
+    - name: 2.6 Create application and SQLite data directories inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "mkdir -p {{ app_dir }} /etc/fragment /var/lib/fragment {{ app_source_dir }} &&
+        chown -R {{ app_user }}:{{ app_user }} {{ app_dir }} /etc/fragment /var/lib/fragment {{ app_source_dir }} &&
+        chmod 750 /var/lib/fragment /etc/fragment"
+
+    # -------------------------------------------------------------
+    # 3. CODEBASE TRANSFER & PHOENIX RELEASE BUILD
+    # -------------------------------------------------------------
+    - name: 3.1 Copy project source code from control machine to Proxmox host
+      ansible.builtin.copy:
+        src: "../"
+        dest: "/tmp/fragment-src-host/"
+        mode: '0755'
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.2 Create source archive on Proxmox host
+      ansible.builtin.command: >
+        tar -czf /tmp/fragment-src.tar.gz -C /tmp/fragment-src-host
+        --exclude="_build" --exclude="deps" --exclude=".git" --exclude=".elixir_ls" .
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.3 Push source archive into CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct push {{ app_vmid }} /tmp/fragment-src.tar.gz /tmp/fragment-src.tar.gz
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.4 Extract source code inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "rm -rf {{ app_source_dir }} && mkdir -p {{ app_source_dir }} &&
+        tar -xzf /tmp/fragment-src.tar.gz -C {{ app_source_dir }} &&
+        rm -f /tmp/fragment-src.tar.gz &&
+        chown -R {{ app_user }}:{{ app_user }} {{ app_source_dir }}"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.5 Render environment configuration file inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cat << 'EOF' > {{ env_file_path }}
+        MIX_ENV=prod
+        PHX_SERVER=true
+        PORT={{ app_port }}
+        PHX_HOST={{ phx_host }}
+        DATABASE_PATH={{ db_path }}
+        SECRET_KEY_BASE={{ secret_key_base }}
+        POOL_SIZE=5
+        EOF"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.6 Secure environment configuration file permissions
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "chown {{ app_user }}:{{ app_user }} {{ env_file_path }} && chmod 600 {{ env_file_path }}"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.7 Stop fragment service before rebuild (if active)
+      ansible.builtin.command: pct exec {{ app_vmid }} -- systemctl stop fragment
+      failed_when: false
+      changed_when: true
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.8 Fetch Mix dependencies in prod environment inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cd {{ app_source_dir }} && MIX_ENV=prod mix deps.get --only prod"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.9 Compile dependencies in prod environment inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cd {{ app_source_dir }} && MIX_ENV=prod mix deps.compile"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.10 Setup and precompile static assets inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cd {{ app_source_dir }} && MIX_ENV=prod mix assets.setup && MIX_ENV=prod mix compile && MIX_ENV=prod mix assets.deploy"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.11 Run SQLite database migrations inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "set -a && source {{ env_file_path }} && set +a && cd {{ app_source_dir }} && MIX_ENV=prod mix ecto.migrate"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.12 Build Phoenix Release into {{ app_dir }} inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cd {{ app_source_dir }} && MIX_ENV=prod mix release --path {{ app_dir }} --overwrite"
+      tags: ['deploy', 'redeploy']
+
+    - name: 3.13 Set ownership on release and database directories
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "chown -R {{ app_user }}:{{ app_user }} {{ app_dir }} /var/lib/fragment"
+      tags: ['deploy', 'redeploy']
+
+    # -------------------------------------------------------------
+    # 4. SYSTEMD SERVICE & NGINX REVERSE PROXY
+    # -------------------------------------------------------------
+    - name: 4.1 Render Systemd Service Unit File inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cat << 'EOF' > /etc/systemd/system/fragment.service
+        [Unit]
+        Description=Fragment Phoenix Pastebin Service
+        After=network.target
+
+        [Service]
+        Type=exec
+        User={{ app_user }}
+        Group={{ app_user }}
+        WorkingDirectory={{ app_dir }}
+        EnvironmentFile={{ env_file_path }}
+        ExecStart={{ app_dir }}/bin/fragment start
+        ExecStop={{ app_dir }}/bin/fragment stop
+        Restart=always
+        RestartSec=5
+        LimitNOFILE=65536
+
+        [Install]
+        WantedBy=multi-user.target
+        EOF"
+      tags: ['deploy', 'redeploy']
+
+    - name: 4.2 Enable and restart fragment.service inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "systemctl daemon-reload && systemctl enable fragment && systemctl restart fragment"
+      tags: ['deploy', 'redeploy']
+
+    - name: 4.3 Render Nginx Site Configuration inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "cat << 'EOF' > /etc/nginx/sites-available/fragment
+        map \$http_upgrade \$connection_upgrade {
+            default upgrade;
+            ''      close;
+        }
+
+        server {
+            listen 80;
+            server_name {{ phx_host }} {{ app_ip }} localhost;
+
+            client_max_body_size 10M;
+
+            location / {
+                proxy_pass http://127.0.0.1:{{ app_port }};
+                proxy_http_version 1.1;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto \$scheme;
+            }
+
+            location /live/websocket {
+                proxy_pass http://127.0.0.1:{{ app_port }};
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \$connection_upgrade;
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_read_timeout 86400s;
+                proxy_send_timeout 86400s;
+            }
+        }
+        EOF"
+
+    - name: 4.4 Enable Nginx Site and Reload Service inside CT {{ app_vmid }}
+      ansible.builtin.command: >
+        pct exec {{ app_vmid }} -- bash -c "ln -sf /etc/nginx/sites-available/fragment /etc/nginx/sites-enabled/default && nginx -t && systemctl reload nginx"
+
+    - name: 4.5 Wait for fragment application to respond
+      ansible.builtin.pause:
+        seconds: 3
+      tags: ['deploy', 'redeploy']
+
+    - name: 4.6 Verify HTTP service endpoint
+      ansible.builtin.uri:
+        url: "http://{{ app_ip }}:{{ app_port }}"
+        status_code:
+          - 200
+          - 302
+      register: http_check
+      retries: 10
+      delay: 2
+      until: http_check.status in [200, 302]
+      tags: ['deploy', 'redeploy']
+
+    - name: 4.7 Clean up temporary build artifacts on Proxmox host
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/fragment-src.tar.gz
+        - /tmp/fragment-src-host
+      tags: ['deploy', 'redeploy']
+
+    - name: 4.8 Output Deployment Summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - " FRAGMENT DEPLOYMENT TO LXC {{ app_vmid }} COMPLETED!"
+          - "========================================================="
+          - " Proxmox Host       : {{ proxmox_ip }}"
+          - " Container ID / OS  : {{ app_vmid }} (Ubuntu 24.04)"
+          - " Application IP     : http://{{ app_ip }}"
+          - " Application Port   : {{ app_port }}"
+          - " Database (SQLite)  : {{ db_path }}"
+          - " Service Name       : fragment.service"
+          - " HTTP Check Status  : {{ http_check.status }}"
+          - "========================================================="
+      tags: ['deploy', 'redeploy']

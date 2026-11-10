@@ -1,0 +1,32 @@
+# run migrations inside lxc 106:
+# ansible-playbook ./ansible/db_migrate.yml -i ansible/inventory.ini
+---
+- name: Run Database Migrations in Proxmox LXC Container ID 106
+  hosts: proxmox_hosts
+  gather_facts: false
+  vars:
+    lxc_id: 106
+    build_dir: "/tmp/fragment-build"
+    app_dir: "/opt/fragment"
+    app_user: "fragment"
+    env_file: "/etc/fragment/fragment.env"
+    db_path: "/var/lib/fragment/fragment.db"
+    app_ip: "192.168.1.26"
+    app_port: 4000
+    project_root: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: 1. Verify LXC Container {{ lxc_id }} is running
+      ansible.builtin.command: pct status {{ lxc_id }}
+      register: lxc_status
+      changed_when: false
+      failed_when: "'status: running' not in lxc_status.stdout"
+
+    - name: 2. Run SQLite database migrations inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "set -a && source {{ env_file }} && set +a && cd {{ build_dir }} && MIX_ENV=prod mix ecto.migrate"
+      changed_when: true
+
+    - name: 3. Ensure permissions on SQLite database file
+      ansible.builtin.command: pct exec {{ lxc_id }} -- chown -R {{ app_user }}:{{ app_user }} /var/lib/fragment
+      changed_when: true

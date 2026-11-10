@@ -1,0 +1,179 @@
+# deploy fragment to lxc 106:
+# ansible-playbook ./ansible/deploy_lxc106.yml -i ansible/inventory.ini
+---
+- name: Deploy Fragment Code to Proxmox LXC Container ID 106 (Ubuntu 24.04)
+  hosts: proxmox_hosts
+  gather_facts: false
+  vars:
+    lxc_id: 106
+    build_dir: "/tmp/fragment-build"
+    app_dir: "/opt/fragment"
+    app_user: "fragment"
+    env_file: "/etc/fragment/fragment.env"
+    db_path: "/var/lib/fragment/fragment.db"
+    app_ip: "192.168.1.26"
+    app_port: 4000
+    project_root: "{{ playbook_dir }}/.."
+
+  tasks:
+    # -------------------------------------------------------------
+    # 1. VERIFY LXC CONTAINER STATUS
+    # -------------------------------------------------------------
+    - name: 1a. Verify LXC Container {{ lxc_id }} status on Proxmox host
+      ansible.builtin.command: pct status {{ lxc_id }}
+      register: lxc_status
+      changed_when: false
+      failed_when: false
+
+    - name: 1b. Fail if LXC container {{ lxc_id }} does not exist
+      ansible.builtin.fail:
+        msg: "LXC container {{ lxc_id }} was not found on Proxmox host {{ inventory_hostname }}."
+      when: lxc_status.rc != 0
+
+    - name: 1c. Start LXC container {{ lxc_id }} if stopped
+      ansible.builtin.command: pct start {{ lxc_id }}
+      when: "lxc_status.rc == 0 and 'status: stopped' in lxc_status.stdout"
+
+    # -------------------------------------------------------------
+    # 2. LOCAL ASSET DIRECTORY VERIFICATION
+    # -------------------------------------------------------------
+    - name: 2. Ensure static images directory exists locally
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: "{{ project_root }}/priv/static/images"
+        state: directory
+        mode: '0755'
+
+    # -------------------------------------------------------------
+    # 3. CODEBASE TRANSFER TO LXC CONTAINER
+    # -------------------------------------------------------------
+    - name: 3. Prepare build directory inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "rm -rf {{ build_dir }} && mkdir -p {{ build_dir }}"
+      changed_when: true
+
+    - name: 4a. Create codebase tarball on local control machine
+      delegate_to: localhost
+      become: false
+      ansible.builtin.shell: >
+        tar --exclude='_build' --exclude='deps' --exclude='.git' --exclude='node_modules' --exclude='.elixir_ls'
+        -czf /tmp/fragment_deploy.tar.gz -C {{ project_root }} .
+      changed_when: true
+
+    - name: 4b. Transfer tarball to Proxmox host
+      ansible.builtin.copy:
+        src: /tmp/fragment_deploy.tar.gz
+        dest: /tmp/fragment_deploy.tar.gz
+        mode: '0644'
+
+    - name: 4c. Push tarball into LXC {{ lxc_id }}
+      ansible.builtin.command: pct push {{ lxc_id }} /tmp/fragment_deploy.tar.gz /tmp/fragment_deploy.tar.gz
+      changed_when: true
+
+    - name: 4d. Extract codebase inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "tar -xzf /tmp/fragment_deploy.tar.gz -C {{ build_dir }} && rm -f /tmp/fragment_deploy.tar.gz"
+      changed_when: true
+
+    - name: 4e. Clean up temporary tarball on Proxmox host
+      ansible.builtin.file:
+        path: /tmp/fragment_deploy.tar.gz
+        state: absent
+
+    - name: 4f. Clean up temporary tarball on local control machine
+      delegate_to: localhost
+      become: false
+      ansible.builtin.file:
+        path: /tmp/fragment_deploy.tar.gz
+        state: absent
+
+    - name: 5. Set directory ownership to {{ app_user }} inside LXC {{ lxc_id }}
+      ansible.builtin.command: pct exec {{ lxc_id }} -- chown -R {{ app_user }}:{{ app_user }} {{ build_dir }}
+      changed_when: true
+
+    # -------------------------------------------------------------
+    # 4. BUILD & VERIFICATION INSIDE LXC CONTAINER
+    # -------------------------------------------------------------
+    - name: 6. Run mix precommit verification inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "export LANG=C.UTF-8 LC_ALL=C.UTF-8 ELIXIR_ERL_OPTIONS=\"+fnu\" && cd {{ build_dir }} && MIX_ENV=test mix deps.get && MIX_ENV=test mix precommit"
+      changed_when: false
+
+    - name: 7. Stop fragment systemd service before release build
+      ansible.builtin.command: pct exec {{ lxc_id }} -- systemctl stop fragment
+      failed_when: false
+      changed_when: true
+
+    - name: 8. Fetch mix dependencies inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "set -a && source {{ env_file }} && set +a && cd {{ build_dir }} && MIX_ENV=prod mix deps.get --only prod"
+      changed_when: true
+
+    - name: 9. Compile dependencies inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "cd {{ build_dir }} && MIX_ENV=prod mix deps.compile"
+      changed_when: true
+
+    - name: 10. Compile assets and deploy static assets inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "cd {{ build_dir }} && MIX_ENV=prod mix assets.setup && MIX_ENV=prod mix compile && MIX_ENV=prod mix assets.deploy"
+      changed_when: true
+
+    - name: 11. Run SQLite database migrations inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "set -a && source {{ env_file }} && set +a && cd {{ build_dir }} && MIX_ENV=prod mix ecto.migrate"
+      changed_when: true
+
+    - name: 12. Generate production OTP Release into {{ app_dir }} inside LXC {{ lxc_id }}
+      ansible.builtin.command: >
+        pct exec {{ lxc_id }} -- bash -c "cd {{ build_dir }} && MIX_ENV=prod mix release --path {{ app_dir }} --overwrite"
+      changed_when: true
+
+    - name: 13. Fix ownership permissions for {{ app_user }}
+      ansible.builtin.command: pct exec {{ lxc_id }} -- chown -R {{ app_user }}:{{ app_user }} {{ app_dir }} /var/lib/fragment
+      changed_when: true
+
+    - name: 14. Start fragment systemd service inside LXC {{ lxc_id }}
+      ansible.builtin.command: pct exec {{ lxc_id }} -- systemctl restart fragment
+      changed_when: true
+
+    - name: 15. Wait for service to initialize
+      ansible.builtin.pause:
+        seconds: 3
+
+    - name: 16. Verify HTTP service endpoint
+      ansible.builtin.uri:
+        url: "http://{{ app_ip }}:{{ app_port }}"
+        status_code:
+          - 200
+          - 302
+      register: http_check
+      retries: 10
+      delay: 2
+      until: http_check.status in [200, 302]
+
+    - name: 16b. Verify logo SVG endpoint
+      ansible.builtin.uri:
+        url: "http://{{ app_ip }}:{{ app_port }}/images/logo.svg"
+        status_code: [200, 404]
+      register: logo_check
+      failed_when: false
+
+    - name: 17. Display deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - "FRAGMENT DEPLOYMENT TO LXC {{ lxc_id }} SUCCESSFUL"
+          - "========================================================="
+          - " Target LXC Container ID : {{ lxc_id }} (Ubuntu 24.04)"
+          - " Proxmox Host            : {{ inventory_hostname }} ({{ ansible_host }})"
+          - " Application Directory  : {{ app_dir }}"
+          - " SQLite Database        : {{ db_path }}"
+          - " Application Endpoint   : http://{{ app_ip }}:{{ app_port }}"
+          - " Logo Image Endpoint     : http://{{ app_ip }}:{{ app_port }}/images/logo.svg"
+          - " HTTP Check Status       : {{ http_check.status }}"
+          - " Logo Check Status       : {{ logo_check.status }}"
+          - " Systemd Service Status  : Active (Running)"
+          - "========================================================="
+

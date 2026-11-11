@@ -7,7 +7,7 @@ This directory contains automated **Ansible playbooks** to provision an unprivil
 ## Target Architecture
 
 - **Proxmox Host:** `192.168.1.19` (SSH user: `root`)
-- **Container 108 (`fragment-app`):** `192.168.1.26/24`
+- **Container 108 (`fragment-app`):** `192.168.1.28/24`
   - **Base OS:** Ubuntu 24.04 LTS (Noble Numbat)
   - **Runtime:** Erlang/OTP 26 + Elixir 1.17+
   - **Database:** SQLite3 (`/var/lib/fragment/fragment.db`)
@@ -83,7 +83,7 @@ After playbook execution, verify the running application:
 
 ```bash
 # Test HTTP response from application container
-curl -I http://192.168.1.26
+curl -I http://192.168.1.28
 
 # Check Fragment systemd service status via Proxmox pct
 sshpass -p 'dexter33143' ssh root@192.168.1.19 "pct exec 108 -- systemctl status fragment"

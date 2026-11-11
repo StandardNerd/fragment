@@ -12,7 +12,7 @@ template_name: "local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 # Target LXC Container ID 108 (Fragment App - Ubuntu 24.04)
 app_vmid: 108
 app_hostname: "fragment-app"
-app_ip: "192.168.1.26"
+app_ip: "192.168.1.28"
 app_ram: 4096
 app_cores: 2
 app_disk: "20"

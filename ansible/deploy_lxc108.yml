@@ -11,7 +11,7 @@
     app_user: "fragment"
     env_file: "/etc/fragment/fragment.env"
     db_path: "/var/lib/fragment/fragment.db"
-    app_ip: "192.168.1.26"
+    app_ip: "192.168.1.28"
     app_port: 4000
     project_root: "{{ playbook_dir }}/.."
 

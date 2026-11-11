@@ -1,0 +1,374 @@
+---
+- name: Migrate Immich Storage to External USB SSD on Proxmox VE
+  hosts: proxmox
+  gather_facts: true
+  vars:
+    # LXC Container Configuration
+    vmid: 107
+    lxc_conf_path: "/etc/pve/lxc/{{ vmid }}.conf"
+    unprivileged_uid_offset: 100000
+
+    # External USB SSD Configuration
+    ssd_device: "/dev/sda1"
+    ssd_fs_type: "ext4"
+    ssd_fs_label: "immich-ssd"
+    ssd_mount_host: "/mnt/immich-ssd"
+    ssd_mount_container: "/mnt/immich-ssd"
+
+    # Immich Directories & Paths
+    immich_app_dir: "/opt/immich-app"
+    immich_env_file: "{{ immich_app_dir }}/.env"
+    immich_old_photos_dir: "/var/lib/immich/photos"
+    immich_new_photos_dir: "{{ ssd_mount_container }}/photos"
+    immich_backup_dir: "{{ ssd_mount_container }}/backup/photos"
+
+    # Host Backup Configuration
+    host_backup_dir: "/root/immich_pre_migration_backup"
+
+    # Cleanup Flags (Safety toggles: set to true to execute cleanup)
+    cleanup_old_files: false
+    delete_snapshot: false
+    snapshot_name: "november2026"
+
+  tasks:
+    # -------------------------------------------------------------------------
+    # PHASE 1: PRE-FLIGHT & INSPECTION
+    # -------------------------------------------------------------------------
+    - name: "[Phase 1] Check LXC container status"
+      ansible.builtin.command:
+        cmd: "pct status {{ vmid }}"
+      register: lxc_status
+      changed_when: false
+      tags: [inspect, preflight]
+
+    - name: "[Phase 1] Assert LXC container is running"
+      ansible.builtin.assert:
+        that:
+          - "'status: running' in lxc_status.stdout"
+        fail_msg: "LXC container {{ vmid }} is not running!"
+      tags: [inspect, preflight]
+
+    - name: "[Phase 1] Verify USB SSD block device exists"
+      ansible.builtin.stat:
+        path: "{{ ssd_device }}"
+      register: ssd_stat
+      tags: [inspect, preflight]
+
+    - name: "[Phase 1] Assert USB SSD device exists"
+      ansible.builtin.assert:
+        that:
+          - ssd_stat.stat.exists
+          - ssd_stat.stat.isblk
+        fail_msg: "SSD device {{ ssd_device }} not found!"
+      tags: [inspect, preflight]
+
+    - name: "[Phase 1] Read USB SSD UUID"
+      ansible.builtin.command:
+        cmd: "blkid -s UUID -o value {{ ssd_device }}"
+      register: ssd_uuid_cmd
+      changed_when: false
+      tags: [inspect, preflight]
+
+    - name: "[Phase 1] Set SSD UUID fact"
+      ansible.builtin.set_fact:
+        ssd_uuid: "{{ ssd_uuid_cmd.stdout | trim }}"
+      tags: [inspect, preflight]
+
+    - name: "[Phase 1] Display identified SSD UUID"
+      ansible.builtin.debug:
+        msg: "Target SSD: {{ ssd_device }} with UUID: {{ ssd_uuid }}"
+      tags: [inspect, preflight]
+
+    # -------------------------------------------------------------------------
+    # PHASE 2: DATABASE & CONFIGURATION BACKUP
+    # -------------------------------------------------------------------------
+    - name: "[Phase 2] Ensure host backup directory exists"
+      ansible.builtin.file:
+        path: "{{ host_backup_dir }}"
+        state: directory
+        mode: "0750"
+      tags: [backup]
+
+    - name: "[Phase 2] Set timestamp fact for backup"
+      ansible.builtin.set_fact:
+        backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+      tags: [backup]
+
+    - name: "[Phase 2] Create PostgreSQL database dump from container"
+      ansible.builtin.shell:
+        cmd: >
+          pct exec {{ vmid }} -- docker exec immich_postgres
+          pg_dump -U postgres -d immich --clean --if-exists
+          | gzip > {{ host_backup_dir }}/immich_db_{{ backup_timestamp }}.sql.gz
+      args:
+        creates: "{{ host_backup_dir }}/immich_db_{{ backup_timestamp }}.sql.gz"
+      tags: [backup]
+
+    - name: "[Phase 2] Verify PostgreSQL dump integrity"
+      ansible.builtin.command:
+        cmd: "gzip -t {{ host_backup_dir }}/immich_db_{{ backup_timestamp }}.sql.gz"
+      changed_when: false
+      tags: [backup]
+
+    - name: "[Phase 2] Back up Immich compose configuration"
+      ansible.builtin.shell:
+        cmd: "pct exec {{ vmid }} -- cat {{ immich_app_dir }}/docker-compose.yml > {{ host_backup_dir }}/docker-compose.yml"
+      changed_when: false
+      tags: [backup]
+
+    - name: "[Phase 2] Back up Immich environment file"
+      ansible.builtin.shell:
+        cmd: "pct exec {{ vmid }} -- cat {{ immich_env_file }} > {{ host_backup_dir }}/.env"
+      changed_when: false
+      tags: [backup]
+
+    - name: "[Phase 2] Back up LXC container configuration"
+      ansible.builtin.copy:
+        src: "{{ lxc_conf_path }}"
+        dest: "{{ host_backup_dir }}/{{ vmid }}.conf.bak"
+        remote_src: true
+        mode: "0640"
+      tags: [backup]
+
+    - name: "[Phase 2] Gracefully stop Immich containers prior to migration"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- bash -c 'cd {{ immich_app_dir }} && docker compose down'"
+      changed_when: true
+      tags: [backup]
+
+    # -------------------------------------------------------------------------
+    # PHASE 3: USB SSD PREPARATION & PERSISTENT HOST MOUNT
+    # -------------------------------------------------------------------------
+    - name: "[Phase 3] Check existing filesystem on SSD"
+      ansible.builtin.command:
+        cmd: "blkid -s TYPE -o value {{ ssd_device }}"
+      register: current_fstype
+      failed_when: false
+      changed_when: false
+      tags: [storage]
+
+    - name: "[Phase 3] Format SSD with ext4 if unformatted"
+      ansible.builtin.command:
+        cmd: "mkfs.ext4 -F -L {{ ssd_fs_label }} {{ ssd_device }}"
+      when: current_fstype.stdout | trim != ssd_fs_type
+      tags: [storage]
+
+    - name: "[Phase 3] Create host mountpoint directory if missing"
+      ansible.builtin.file:
+        path: "{{ ssd_mount_host }}"
+        state: directory
+        mode: "0755"
+      tags: [storage]
+
+    - name: "[Phase 3] Apply under-mount write safeguard (immutable & mode 0000 when unmounted)"
+      ansible.builtin.shell:
+        cmd: >
+          if ! mountpoint -q {{ ssd_mount_host }}; then
+            chmod 0000 {{ ssd_mount_host }}
+            chattr +i {{ ssd_mount_host }}
+          fi
+      changed_when: false
+      tags: [storage]
+
+    - name: "[Phase 3] Configure persistent mount in /etc/fstab"
+      ansible.posix.mount:
+        path: "{{ ssd_mount_host }}"
+        src: "UUID={{ ssd_uuid }}"
+        fstype: "{{ ssd_fs_type }}"
+        opts: "defaults,noatime,nofail"
+        state: mounted
+      tags: [storage]
+
+    - name: "[Phase 3] Set host mountpoint ownership for unprivileged container (UID/GID offset 100000)"
+      ansible.builtin.file:
+        path: "{{ ssd_mount_host }}"
+        owner: "{{ unprivileged_uid_offset }}"
+        group: "{{ unprivileged_uid_offset }}"
+        mode: "0755"
+      tags: [storage]
+
+    # -------------------------------------------------------------------------
+    # PHASE 4: PROXMOX LXC MOUNT POINT CONFIGURATION
+    # -------------------------------------------------------------------------
+    - name: "[Phase 4] Check if bind mount is configured in LXC"
+      ansible.builtin.command:
+        cmd: "grep -E '^mp0:' {{ lxc_conf_path }}"
+      register: mp0_check
+      failed_when: false
+      changed_when: false
+      tags: [lxc]
+
+    - name: "[Phase 4] Attach bind mount to LXC container"
+      ansible.builtin.command:
+        cmd: "pct set {{ vmid }} -mp0 {{ ssd_mount_host }},mp={{ ssd_mount_container }}"
+      when: mp0_check.rc != 0
+      tags: [lxc]
+
+    - name: "[Phase 4] Verify mount is visible inside LXC container"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- mountpoint -q {{ ssd_mount_container }}"
+      changed_when: false
+      tags: [lxc]
+
+    # -------------------------------------------------------------------------
+    # PHASE 5: DATA MIGRATION & SECONDARY BACKUP
+    # -------------------------------------------------------------------------
+    - name: "[Phase 5] Create SSD target and backup directories inside LXC"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- mkdir -p {{ immich_backup_dir }} {{ immich_new_photos_dir }}"
+      changed_when: false
+      tags: [migrate]
+
+    - name: "[Phase 5] Rsync media to standalone backup directory on SSD"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- rsync -aHAX {{ immich_old_photos_dir }}/ {{ immich_backup_dir }}/"
+      changed_when: true
+      tags: [migrate]
+
+    - name: "[Phase 5] Rsync media to primary upload directory on SSD"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- rsync -aHAX {{ immich_backup_dir }}/ {{ immich_new_photos_dir }}/"
+      changed_when: true
+      tags: [migrate]
+
+    - name: "[Phase 5] Verify file counts between source and migrated storage"
+      ansible.builtin.shell:
+        cmd: >
+          pct exec {{ vmid }} -- bash -c '
+            src_cnt=$(find {{ immich_old_photos_dir }} -type f | wc -l);
+            dst_cnt=$(find {{ immich_new_photos_dir }} -type f | wc -l);
+            if [ "$src_cnt" -gt 0 ] && [ "$src_cnt" -ne "$dst_cnt" ]; then
+              echo "Count mismatch: $src_cnt vs $dst_cnt" && exit 1;
+            fi
+          '
+      changed_when: false
+      tags: [migrate]
+
+    # -------------------------------------------------------------------------
+    # PHASE 6: CONFIGURE IMMICH
+    # -------------------------------------------------------------------------
+    - name: "[Phase 6] Update UPLOAD_LOCATION in .env inside LXC"
+      ansible.builtin.shell:
+        cmd: >
+          pct exec {{ vmid }} -- sed -i
+          's|^UPLOAD_LOCATION=.*|UPLOAD_LOCATION={{ immich_new_photos_dir }}|'
+          {{ immich_env_file }}
+      changed_when: true
+      tags: [configure]
+
+    - name: "[Phase 6] Verify DB_DATA_LOCATION remains on internal storage"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- grep '^DB_DATA_LOCATION=' {{ immich_env_file }}"
+      register: db_data_loc
+      changed_when: false
+      tags: [configure]
+
+    - name: "[Phase 6] Assert database location is untouched"
+      ansible.builtin.assert:
+        that:
+          - "'./postgres' in db_data_loc.stdout"
+        fail_msg: "DB_DATA_LOCATION was modified unexpectedly!"
+      tags: [configure]
+
+    # -------------------------------------------------------------------------
+    # PHASE 7 & 8: SYSTEMD SERVICE & AUTOMATED STARTUP
+    # -------------------------------------------------------------------------
+    - name: "[Phase 8] Deploy immich.service systemd unit inside LXC"
+      ansible.builtin.shell:
+        cmd: |
+          pct exec {{ vmid }} -- bash -c 'cat << "EOF" > /etc/systemd/system/immich.service
+          [Unit]
+          Description=Immich Photo Management Service
+          After=docker.service
+          Requires=docker.service
+          RequiresMountsFor={{ ssd_mount_container }}
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          WorkingDirectory={{ immich_app_dir }}
+          ExecStart=/bin/docker compose up -d
+          ExecStop=/bin/docker compose down
+          TimeoutStartSec=0
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          systemctl daemon-reload
+          systemctl enable immich.service
+          '
+      changed_when: true
+      tags: [systemd, persistence]
+
+    - name: "[Phase 7] Start Immich via systemd service inside LXC"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- systemctl start immich.service"
+      changed_when: true
+      tags: [validate]
+
+    - name: "[Phase 7] Wait for Immich containers to become healthy"
+      ansible.builtin.shell:
+        cmd: >
+          pct exec {{ vmid }} -- bash -c '
+            for i in $(seq 1 30); do
+              unhealthy=$(docker ps --filter "name=immich" --filter "health=starting" -q);
+              if [ -z "$unhealthy" ]; then
+                exit 0;
+              fi
+              sleep 2;
+            done
+            exit 1;
+          '
+      changed_when: false
+      tags: [validate]
+
+    - name: "[Phase 7] Validate Immich API ping"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- curl -fsS http://localhost:2283/api/server/ping"
+      register: api_ping
+      changed_when: false
+      retries: 5
+      delay: 3
+      until: api_ping.rc == 0 and '"pong"' in api_ping.stdout
+      tags: [validate]
+
+    - name: "[Phase 7] Validate database connectivity and asset records"
+      ansible.builtin.command:
+        cmd: "pct exec {{ vmid }} -- docker exec immich_postgres psql -U postgres -d immich -c 'SELECT count(*) FROM asset;'"
+      register: asset_count
+      changed_when: false
+      tags: [validate]
+
+    - name: "[Phase 7] Display validation results"
+      ansible.builtin.debug:
+        msg:
+          - "API Ping: {{ api_ping.stdout }}"
+          - "Asset Query: {{ asset_count.stdout_lines | select('match', '^[ ]*[0-9]+') | list }}"
+      tags: [validate]
+
+    # -------------------------------------------------------------------------
+    # PHASE 9: OPTIONAL CLEANUP & SPACE RECLAMATION
+    # -------------------------------------------------------------------------
+    - name: "[Phase 9] Clean old photos directory inside LXC (guarded)"
+      ansible.builtin.shell:
+        cmd: >
+          pct exec {{ vmid }} -- bash -c '
+            rm -rf {{ immich_old_photos_dir }}/* &&
+            echo "Storage migrated to {{ immich_new_photos_dir }} on external USB SSD" > {{ immich_old_photos_dir }}/MIGRATED_TO_SSD_README.txt
+          '
+      when: cleanup_old_files | bool
+      tags: [cleanup]
+
+    - name: "[Phase 9] Run fstrim on LXC container from Proxmox host"
+      ansible.builtin.command:
+        cmd: "pct fstrim {{ vmid }}"
+      when: cleanup_old_files | bool
+      register: fstrim_out
+      changed_when: true
+      tags: [cleanup]
+
+    - name: "[Phase 9] Delete old pre-migration snapshot (guarded)"
+      ansible.builtin.command:
+        cmd: "pct delsnapshot {{ vmid }} {{ snapshot_name }}"
+      when: delete_snapshot | bool
+      tags: [cleanup]

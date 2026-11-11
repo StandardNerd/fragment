@@ -110,32 +110,28 @@ defmodule FragmentWeb.Layouts do
 
   def theme_toggle(assigns) do
     ~H"""
-    <div
-      class="inline-flex items-center rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface-elevated)] p-0.5"
-      role="group"
-      aria-label="Theme toggle"
+    <button
+      type="button"
+      id="theme-toggle"
+      data-phx-theme="toggle"
+      aria-label="Switch to dark mode"
+      title="Switch to dark mode"
+      onclick="window.dispatchEvent(new CustomEvent('phx:set-theme', {detail: {theme: 'toggle'}}))"
+      class="inline-flex items-center justify-center size-8 sm:size-9 rounded-md border border-[var(--frag-border)] bg-[var(--frag-surface-elevated)] text-[var(--frag-text-muted)] hover:text-[var(--frag-text)] hover:border-[var(--frag-accent)] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--frag-accent)] transition-all cursor-pointer"
     >
-      <button
-        type="button"
-        title="Dark theme"
-        aria-label="Switch to dark theme"
-        data-phx-theme="dark"
-        onclick="window.dispatchEvent(new CustomEvent('phx:set-theme', {detail: {theme: 'dark'}}))"
-        class="inline-flex items-center justify-center size-7 rounded-sm text-[var(--frag-text-muted)] hover:text-[var(--frag-text)] [[data-theme=dark]_&]:bg-[var(--frag-surface)] [[data-theme=dark]_&]:text-[var(--frag-accent)] [[data-theme=dark]_&]:shadow-2xs transition-all cursor-pointer"
+      <span
+        class="hidden [[data-theme=dark]_&]:inline-flex items-center justify-center"
+        aria-hidden="true"
       >
-        <.icon name="hero-moon-micro" class="size-4" />
-      </button>
-      <button
-        type="button"
-        title="Light theme"
-        aria-label="Switch to light theme"
-        data-phx-theme="light"
-        onclick="window.dispatchEvent(new CustomEvent('phx:set-theme', {detail: {theme: 'light'}}))"
-        class="inline-flex items-center justify-center size-7 rounded-sm text-[var(--frag-text-muted)] hover:text-[var(--frag-text)] [[data-theme=light]_&]:bg-[var(--frag-surface)] [[data-theme=light]_&]:text-[var(--frag-accent)] [[data-theme=light]_&]:shadow-2xs transition-all cursor-pointer"
+        <.icon name="hero-sun-micro" class="size-4 text-[var(--frag-accent)]" />
+      </span>
+      <span
+        class="inline-flex [[data-theme=dark]_&]:hidden items-center justify-center"
+        aria-hidden="true"
       >
-        <.icon name="hero-sun-micro" class="size-4" />
-      </button>
-    </div>
+        <.icon name="hero-moon-micro" class="size-4 text-[var(--frag-text-muted)]" />
+      </span>
+    </button>
     """
   end
 end

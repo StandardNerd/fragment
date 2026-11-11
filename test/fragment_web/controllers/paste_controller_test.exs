@@ -6,11 +6,11 @@ defmodule FragmentWeb.PasteControllerTest do
   alias Fragment.Pastes.Paste
 
   describe "GET / (new paste page)" do
-    test "renders new fragment form with dark mode default, line numbers gutter, API footer link, and logo",
+    test "renders new fragment form with light mode default, line numbers gutter, API footer link, and logo",
          %{conn: conn} do
       conn = get(conn, ~p"/")
       html = html_response(conn, 200)
-      assert html =~ ~s(data-theme="dark")
+      assert html =~ ~s(data-theme="light")
       assert html =~ "New fragment"
       assert html =~ ~s(id="code-line-numbers")
       assert html =~ ~s(data-line="1")
@@ -20,6 +20,8 @@ defmodule FragmentWeb.PasteControllerTest do
       assert html =~ ~s(alt="fragment logo")
       assert html =~ "logo-dark"
       assert html =~ "logo-light"
+      assert html =~ ~s(id="theme-toggle")
+      assert html =~ ~s(aria-label="Switch to dark mode")
     end
 
     test "serves fragment-logo.png and fragment_logo_dark_mode.png static assets", %{conn: conn} do

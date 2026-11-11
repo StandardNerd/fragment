@@ -1,70 +1,137 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="description" content="fragment — a minimal, modern pastebin alternative" />
     <.live_title default="fragment" suffix=" · fragment" phx-no-format>{assigns[:page_title]}</.live_title>
-    <link rel="icon" type="image/png" href={~p"/images/fragment_logo_dark_mode.png"} />
+    <link rel="icon" type="image/png" href={~p"/images/fragment-logo.png"} />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
     <script>
       (() => {
+        const STORAGE_KEY = "phx:theme";
+
         const resolveSystemTheme = () => {
-          if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
-            return "light";
+          if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            return "dark";
           }
-          return "dark";
+          return "light";
         };
 
-        const updateFavicon = () => {
-          const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        const updateFavicon = (theme) => {
+          const isDark = theme === "dark";
           const favicon = document.querySelector("link[rel='icon']");
           if (favicon) {
             favicon.href = isDark ? "/images/fragment_logo_dark_mode.png" : "/images/fragment-logo.png";
           }
         };
 
-        const applyTheme = (theme) => {
-          if (theme === "light" || theme === "dark") {
-            localStorage.setItem("phx:theme", theme);
-            document.documentElement.setAttribute("data-theme", theme);
-            document.documentElement.setAttribute("data-theme-source", "user");
-          } else {
-            localStorage.removeItem("phx:theme");
-            document.documentElement.setAttribute("data-theme", resolveSystemTheme());
-            document.documentElement.setAttribute("data-theme-source", "system");
-          }
-          updateFavicon();
+        const updateToggleAccessibility = (theme) => {
+          const toggle = document.getElementById("theme-toggle");
+          if (!toggle) return;
+          const isDark = theme === "dark";
+          const nextLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
+          toggle.setAttribute("aria-label", nextLabel);
+          toggle.setAttribute("title", nextLabel);
         };
 
-        const saved = localStorage.getItem("phx:theme");
-        applyTheme(saved || "system");
+        const hasStoredChoice = () => {
+          try {
+            const val = localStorage.getItem(STORAGE_KEY);
+            return val === "light" || val === "dark";
+          } catch (_e) {
+            return false;
+          }
+        };
+
+        const getStoredChoice = () => {
+          try {
+            return localStorage.getItem(STORAGE_KEY);
+          } catch (_e) {
+            return null;
+          }
+        };
+
+        const applyTheme = (theme, persist = false) => {
+          let resolved = theme;
+          if (theme === "light" || theme === "dark") {
+            resolved = theme;
+            if (persist) {
+              try {
+                localStorage.setItem(STORAGE_KEY, theme);
+              } catch (_e) {}
+            }
+            document.documentElement.setAttribute("data-theme", resolved);
+            document.documentElement.setAttribute("data-theme-source", persist || hasStoredChoice() ? "user" : "system");
+          } else {
+            resolved = resolveSystemTheme();
+            if (persist) {
+              try {
+                localStorage.removeItem(STORAGE_KEY);
+              } catch (_e) {}
+            }
+            document.documentElement.setAttribute("data-theme", resolved);
+            document.documentElement.setAttribute("data-theme-source", "system");
+          }
+
+          updateFavicon(resolved);
+          updateToggleAccessibility(resolved);
+        };
+
+        // Check stored preference first; fallback to OS preference only when no stored choice exists
+        const stored = getStoredChoice();
+        if (stored === "light" || stored === "dark") {
+          applyTheme(stored, false);
+        } else {
+          applyTheme(resolveSystemTheme(), false);
+        }
+
+        // Enable smooth ~200ms theme transitions after initial evaluation to prevent transition flash on load
+        if (typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            document.documentElement.classList.add("theme-transitions");
+          });
+        }
 
         window.addEventListener("storage", (e) => {
-          if (e.key === "phx:theme") applyTheme(e.newValue || "system");
+          if (e.key === STORAGE_KEY) {
+            if (e.newValue === "light" || e.newValue === "dark") {
+              applyTheme(e.newValue, false);
+            } else {
+              applyTheme(resolveSystemTheme(), false);
+            }
+          }
         });
 
         window.addEventListener("phx:set-theme", (e) => {
           const requested = e.detail?.theme || e.target?.dataset?.phxTheme;
           if (requested === "toggle") {
-            const current = document.documentElement.getAttribute("data-theme") || "dark";
-            applyTheme(current === "dark" ? "light" : "dark");
-          } else if (requested) {
-            applyTheme(requested);
+            const current = document.documentElement.getAttribute("data-theme") || "light";
+            applyTheme(current === "dark" ? "light" : "dark", true);
+          } else if (requested === "light" || requested === "dark") {
+            applyTheme(requested, true);
+          } else if (requested === "system") {
+            applyTheme("system", true);
           }
         });
 
+        // Respect OS preference only as fallback when no stored choice exists
         if (window.matchMedia) {
-          window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-            if (document.documentElement.getAttribute("data-theme-source") === "system") {
-              document.documentElement.setAttribute("data-theme", resolveSystemTheme());
-              updateFavicon();
+          window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+            if (!hasStoredChoice()) {
+              applyTheme(e.matches ? "dark" : "light", false);
             }
           });
         }
+
+        document.addEventListener("DOMContentLoaded", () => {
+          const current = document.documentElement.getAttribute("data-theme") || "light";
+          updateToggleAccessibility(current);
+          updateFavicon(current);
+        });
       })();
     </script>
   </head>
